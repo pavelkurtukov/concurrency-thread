@@ -3,13 +3,13 @@ import java.util.*;
 public class Main {
 
     public static void main(String[] args) throws InterruptedException {
-        String[] texts = new String[25];
-        for (int i = 0; i < texts.length; i++) {
-            texts[i] = generateText("aab", 30_000);
-        }
+        List<Thread> threads = new ArrayList<>();
 
         long startTs = System.currentTimeMillis(); // start time
-        for (String text : texts) {
+
+        // Логика рассчёта одной строки, вынесенная в лямбда-фунцкию для использования в потоке
+        Runnable analyzeString = () -> {
+            String text = generateText("aab", 30_000);
             int maxSize = 0;
             for (int i = 0; i < text.length(); i++) {
                 for (int j = 0; j < text.length(); j++) {
@@ -29,7 +29,20 @@ public class Main {
                 }
             }
             System.out.println(text.substring(0, 100) + " -> " + maxSize);
+        };
+
+        // Стартуем 25 потоков анализа
+        for (int i = 0; i < 25; i++) {
+            Thread thread = new Thread(analyzeString);
+            threads.add(thread);
+            thread.start();
         }
+
+        // Ждём завершения потоков
+        for (Thread thread : threads) {
+            thread.join();
+        }
+
         long endTs = System.currentTimeMillis(); // end time
 
         System.out.println("Time: " + (endTs - startTs) + "ms");
