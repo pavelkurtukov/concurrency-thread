@@ -1,14 +1,21 @@
 import java.util.*;
+import java.util.concurrent.*;
 
 public class Main {
+    final static int STRING_COUNT = 25;
 
-    public static void main(String[] args) throws InterruptedException {
-        List<Thread> threads = new ArrayList<>();
+    public static void main(String[] args) throws InterruptedException, ExecutionException {
+        int[] results = new int[STRING_COUNT]; // Массив с результатами анализа
+        int totalMax = 0; // Максимальная длина интервала значений
+        List<Future<Integer>> tasks = new ArrayList<>(); // Список заданий для отправки в пул потоков
+
 
         long startTs = System.currentTimeMillis(); // start time
 
-        // Логика рассчёта одной строки, вынесенная в лямбда-фунцкию для использования в потоке
-        Runnable analyzeString = () -> {
+        final ExecutorService threadPool = Executors.newFixedThreadPool(STRING_COUNT); // Определяем пул потоков
+
+        // Логика рассчёта одной строки, вынесенная в лямбда-функцию для использования в потоке
+        Callable<Integer> analyzeString = () -> {
             String text = generateText("aab", 30_000);
             int maxSize = 0;
             for (int i = 0; i < text.length(); i++) {
@@ -28,24 +35,32 @@ public class Main {
                     }
                 }
             }
+            // Всё равно будем выводить результат анализа на экран для проверки результата
             System.out.println(text.substring(0, 100) + " -> " + maxSize);
+
+            return maxSize;
         };
 
-        // Стартуем 25 потоков анализа
-        for (int i = 0; i < 25; i++) {
-            Thread thread = new Thread(analyzeString);
-            threads.add(thread);
-            thread.start();
+        // Стартуем 25 процессов анализа, добавляя их в пул потоков
+        for (int i = 0; i < STRING_COUNT; i++) {
+            tasks.add(threadPool.submit(analyzeString));
         }
 
-        // Ждём завершения потоков
-        for (Thread thread : threads) {
-            thread.join();
+        // Ожидаем, читаем результат работы заданий и определяем максимальный интервал
+        for (Future<Integer> task : tasks) {
+            int currentTaskMaxSize = task.get();
+            if (currentTaskMaxSize > totalMax) totalMax = currentTaskMaxSize;
         }
+
+        // Завершаем работу пула потоков
+        threadPool.shutdown();
+
+        // Выводим результат на экран
+        System.out.println("Максимальная длина интервала значений равна " + totalMax);
 
         long endTs = System.currentTimeMillis(); // end time
 
-        System.out.println("Time: " + (endTs - startTs) + "ms");
+        System.out.println("Time: " + (endTs - startTs) + " ms");
     }
 
     public static String generateText(String letters, int length) {
